@@ -1,0 +1,305 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # N8N Workflow Engine
+  # ============================================
+  n8n:
+    image: n8n:latest
+    container_name: n8n-workflow-engine
+    restart: unless-stopped
+    ports:
+      - "${N8N_PORT}:5678"
+    environment:
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=${N8N_PORT}
+      - N8N_PROTOCOL=${N8N_PROTOCOL}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=${DB_NAME}
+      - DB_POSTGRESDB_USER=${DB_USER}
+      - DB_POSTGRESDB_PASSWORD=${DB_PASSWORD}
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=${NODE_ENV}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - EXECUTIONS_DATA_PRUNE_TIMEOUT=${EXECUTIONS_DATA_PRUNE_TIMEOUT}
+      - EXECUTIONS_DATA_MAX_AGE=${EXECUTIONS_DATA_MAX_AGE}
+      - WEBHOOK_TUNNEL_URL=${WEBHOOK_URL}
+      - WEBHOOK_TUNNEL_AUTH_BASIC=true
+      # API Keys from environment
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflows:/home/node/.n8n/workflows
+      - ./logs:/home/node/.n8n/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - the-legacy-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # ============================================
+  # PostgreSQL Database (Supabase)
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: the-legacy-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_INITDB_ARGS="-c max_connections=200 -c shared_buffers=256MB"
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    networks:
+      - the-legacy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    command:
+      - "postgres"
+      - "-c"
+      - "log_statement=all"
+      - "-c"
+      - "log_min_duration_statement=0"
+
+  # ============================================
+  # Redis Cache
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: the-legacy-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    ports:
+      - "${REDIS_PORT}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - the-legacy-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================
+  # PgAdmin (Database Management UI)
+  # ============================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: the-legacy-pgadmin
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@example.com
+      - PGADMIN_DEFAULT_PASSWORD=${DB_PASSWORD}
+      - SCRIPT_NAME=/pgadmin
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - the-legacy-network
+
+  # ============================================
+  # Redis Commander (Redis Management UI)
+  # ============================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: the-legacy-redis-commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis:6379:0
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - the-legacy-network
+
+  # ============================================
+  # Adminer (Multi-Database Manager)
+  # ============================================
+  adminer:
+    image: adminer:latest
+    container_name: the-legacy-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - the-legacy-network
+
+  # ============================================
+  # Mock API Server (for testing)
+  # ============================================
+  mock-api:
+    image: mockoon/cli:latest
+    container_name: the-legacy-mock-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./mock-api-config.json:/data/mock-api-config.json
+    command: -d /data/mock-api-config.json --port 3000
+    networks:
+      - the-legacy-network
+    profiles:
+      - testing
+
+  # ============================================
+  # Monitoring & Logging Stack
+  # ============================================
+  # Prometheus (Metrics Collection)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: the-legacy-prometheus
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - the-legacy-network
+    profiles:
+      - monitoring
+
+  # Grafana (Visualization)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: the-legacy-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - the-legacy-network
+    profiles:
+      - monitoring
+
+  # Loki (Log Aggregation)
+  loki:
+    image: grafana/loki:latest
+    container_name: the-legacy-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./monitoring/loki-config.yaml:/etc/loki/local-config.yaml
+      - loki_data:/loki
+    networks:
+      - the-legacy-network
+    profiles:
+      - monitoring
+
+  # Promtail (Log Forwarder)
+  promtail:
+    image: grafana/promtail:latest
+    container_name: the-legacy-promtail
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/promtail-config.yaml:/etc/promtail/config.yml
+      - /var/log:/var/log
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    networks:
+      - the-legacy-network
+    profiles:
+      - monitoring
+
+# ============================================
+# Volumes
+# ============================================
+volumes:
+  n8n_data:
+    driver: local
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  loki_data:
+    driver: local
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  the-legacy-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# ============================================
+# Usage Instructions
+# ============================================
+# 
+# Start all services:
+#   docker-compose up -d
+#
+# Start with monitoring stack:
+#   docker-compose --profile monitoring up -d
+#
+# View logs:
+#   docker-compose logs -f n8n
+#   docker-compose logs -f postgres
+#
+# Stop all services:
+#   docker-compose down
+#
+# Remove volumes (WARNING: deletes data):
+#   docker-compose down -v
+#
+# Access services:
+#   N8N UI: http://localhost:5678
+#   PgAdmin: http://localhost:5050
+#   Redis Commander: http://localhost:8081
+#   Adminer: http://localhost:8080
+#   Grafana: http://localhost:3001 (user: admin, password: admin)
+#   Prometheus: http://localhost:9090
+#
+# ============================================

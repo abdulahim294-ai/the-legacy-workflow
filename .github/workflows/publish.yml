@@ -1,0 +1,26 @@
+name: 🚀 Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            THE_LEGACY_Enterprise_Workflow_v1.json
+            THE_LEGACY_Advanced_Extensions_v2.0.json
+            THE_LEGACY_Implementation_Guide_v3.0.json
+            README.md
+            LICENSE
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,172 @@
+{
+  "name": "the-legacy-workflow",
+  "version": "3.0.0",
+  "description": "Advanced N8N Workflow for Production-Grade Content Management & Multi-System Orchestration",
+  "keywords": [
+    "n8n",
+    "workflow",
+    "automation",
+    "enterprise",
+    "orchestration",
+    "google-drive",
+    "anthropic-claude",
+    "supabase",
+    "github",
+    "slack",
+    "etl",
+    "data-pipeline"
+  ],
+  "author": "Advanced Enterprise Automation Architect",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/the-legacy-workflow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/the-legacy-workflow/issues"
+  },
+  "homepage": "https://github.com/your-username/the-legacy-workflow#readme",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "scripts": {
+    "start": "n8n start",
+    "dev": "n8n start --tunnel",
+    "build": "n8n build",
+    "test": "jest --detectOpenHandles --forceExit",
+    "test:watch": "jest --watch",
+    "test:unit": "jest --testPathPattern=unit",
+    "test:integration": "jest --testPathPattern=integration",
+    "test:e2e": "jest --testPathPattern=e2e",
+    "test:coverage": "jest --coverage --detectOpenHandles --forceExit",
+    "lint": "eslint . --ext .js,.json",
+    "lint:fix": "eslint . --ext .js,.json --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "validate": "npm run lint && npm run test:coverage",
+    "docs:build": "jsdoc -c jsdoc.json",
+    "docs:serve": "http-server ./docs -p 8080",
+    "credentials:test": "node scripts/test-credentials.js",
+    "credentials:refresh": "node scripts/refresh-credentials.js",
+    "db:init": "npm run db:migrate && npm run db:seed",
+    "db:migrate": "supabase migration up",
+    "db:seed": "node scripts/seed-database.js",
+    "workflow:export": "node scripts/export-workflow.js",
+    "workflow:import": "node scripts/import-workflow.js",
+    "workflow:validate": "node scripts/validate-workflow.js",
+    "performance:benchmark": "node scripts/benchmark-workflow.js",
+    "security:audit": "npm audit && snyk test",
+    "security:scan": "node scripts/security-scan.js",
+    "health:check": "node scripts/health-check.js",
+    "monitoring:setup": "node scripts/setup-monitoring.js",
+    "ci:validate": "npm run lint && npm run test:coverage && npm run workflow:validate",
+    "prepare": "husky install"
+  },
+  "dependencies": {
+    "n8n": "^1.0.0",
+    "n8n-core": "^1.0.0",
+    "n8n-nodes-base": "^1.0.0",
+    "n8n-workflow": "^1.0.0",
+    "axios": "^1.4.0",
+    "dotenv": "^16.0.3",
+    "winston": "^3.8.2",
+    "pino": "^8.14.1",
+    "joi": "^17.9.2",
+    "lodash": "^4.17.21",
+    "moment": "^2.29.4",
+    "pg": "^8.10.0",
+    "redis": "^4.6.5",
+    "supabase": "^2.23.0",
+    "octokit": "^2.0.14",
+    "@slack/web-api": "^6.8.1",
+    "@anthropic-ai/sdk": "^0.7.1",
+    "googleapis": "^118.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.5.0",
+    "jest-extended": "^4.0.1",
+    "supertest": "^6.3.3",
+    "eslint": "^8.43.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.27.5",
+    "eslint-plugin-json": "^3.1.0",
+    "prettier": "^2.8.8",
+    "husky": "^8.0.3",
+    "lint-staged": "^13.2.2",
+    "nodemon": "^2.0.22",
+    "@types/node": "^20.3.1",
+    "jsdoc": "^4.0.2",
+    "snyk": "^1.1223.0",
+    "nyc": "^15.1.0",
+    "http-server": "^14.1.1",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.1"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/**/*.test.js",
+      "!src/**/index.js"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 80,
+        "functions": 80,
+        "lines": 85,
+        "statements": 85
+      }
+    },
+    "testMatch": [
+      "**/__tests__/**/*.js",
+      "**/?(*.)+(spec|test).js"
+    ]
+  },
+  "lint-staged": {
+    "*.{js,json}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.md": [
+      "prettier --write"
+    ]
+  },
+  "prettier": {
+    "semi": true,
+    "trailingComma": "es5",
+    "singleQuote": true,
+    "printWidth": 100,
+    "tabWidth": 2,
+    "useTabs": false,
+    "arrowParens": "always"
+  },
+  "eslintConfig": {
+    "extends": [
+      "airbnb-base"
+    ],
+    "plugins": [
+      "json"
+    ],
+    "rules": {
+      "no-console": [
+        "warn"
+      ],
+      "no-unused-vars": [
+        "error",
+        {
+          "argsIgnorePattern": "^_"
+        }
+      ]
+    },
+    "env": {
+      "node": true,
+      "es2020": true,
+      "jest": true
+    }
+  }
+}
